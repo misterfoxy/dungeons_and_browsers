@@ -14,6 +14,10 @@ export class Game extends Scene
 
     create ()
     {
+
+        this.add.sprite(100, 200, 'wizard')
+        this.add.sprite(300, 600, 'barbar')
+
         // this.camera = this.cameras.main;
         // this.camera.setBackgroundColor(0x00ff00);
 
