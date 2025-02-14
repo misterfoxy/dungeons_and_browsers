@@ -6,6 +6,7 @@ interface Character {
     initiative: number;
     x: number;
     y: number;
+    isPlayer: boolean;
     sprite?: Phaser.GameObjects.Sprite;
     // hexLocation: number;
 }
@@ -21,6 +22,8 @@ export class Game extends Scene
     private gridSize = 64; // Each tile is 64x64 pixels
     private rows = 10;
     private cols = 10;
+    private turnTextObjects: Phaser.GameObjects.Text[] = [];
+
 
 
     constructor ()
@@ -31,14 +34,11 @@ export class Game extends Scene
     create ()
     {
 
-    this.generateMap();
-    this.generateInitiative();
-
-    this.setupCharacters();
-    this.startTurn();
-   
-
-    
+        this.generateMap();
+        this.generateInitiative();
+        this.setupCharacters();
+        this.createTurnUI();
+        this.startTurn();
 
     }
 
@@ -58,60 +58,35 @@ export class Game extends Scene
     }
 
     generateInitiative(): void {
-        console.log('generating init')
+
+        
         this.initiative = [
-            { name: "Player 1", x: 100, y: 100, initiative: Math.random() * 20 },
-            { name: "Enemy 1", x: 400, y: 400, initiative: Math.random() * 20 },
-            { name: "Enemy 2", x: 600, y: 200, initiative: Math.random() * 20 },
-            { name: "Enemy 3", x: 200, y: 400, initiative: Math.random() * 20 }
+            { name: "Player 1", x: 100, y: 100, initiative: Math.random() * 20, isPlayer:true },
+            { name: "Enemy 1", x: 400, y: 400, initiative: Math.random() * 20, isPlayer:false },
+            { name: "Enemy 2", x: 600, y: 200, initiative: Math.random() * 20, isPlayer:false },
+            { name: "Enemy 3", x: 200, y: 400, initiative: Math.random() * 20, isPlayer:false }
         ].sort((a, b) => b.initiative - a.initiative);
     }
 
-    // generateInitiative(){
-    //     const characters = [
-    //         { name: "Player 1", initiative: Math.random() * 20, spriteName: "wizard"},
-    //         { name: "Enemy 1", initiative: Math.random() * 20, spriteName: "barbar" },
-    //         { name: "Enemy 2", initiative: Math.random() * 20, spriteName: "barbar" },
-    //         { name: "Enemy 3", initiative: Math.random() * 20, spriteName: "barbar" }
-    //     ];
-    //     // Sort by highest initiative
-    //     const sorted = [...characters].sort((a, b) => b.initiative - a.initiative);
-    //     console.log(sorted)
-    //     this.initiative=[...sorted];
-
-    //     this.gameText = this.add.text(852, 184, this.initiative[0].name, {
-    //         fontFamily: 'Arial Black', fontSize: 12, color: '#ffffff',
-    //         stroke: '#000000', strokeThickness: 8,
-    //         align: 'center'
-    //     }).setOrigin(0.5).setDepth(100);
-        
-    //     this.gameText = this.add.text(852, 204, this.initiative[1].name, {
-    //         fontFamily: 'Arial Black', fontSize: 12, color: '#ffffff',
-    //         stroke: '#000000', strokeThickness: 8,
-    //         align: 'center'
-    //     }).setOrigin(0.5).setDepth(100);
-        
-    //     this.gameText = this.add.text(852, 224, this.initiative[2].name, {
-    //         fontFamily: 'Arial Black', fontSize: 12, color: '#ffffff',
-    //         stroke: '#000000', strokeThickness: 8,
-    //         align: 'center'
-    //     }).setOrigin(0.5).setDepth(100);
-        
-    //     this.gameText = this.add.text(852, 244, this.initiative[3].name, {
-    //         fontFamily: 'Arial Black', fontSize: 12, color: '#ffffff',
-    //         stroke: '#000000', strokeThickness: 8,
-    //         align: 'center'
-    //     }).setOrigin(0.5).setDepth(100);
-    // }
+    createTurnUI(): void {
+        const uiX = 800; // Adjust for positioning
+        const uiY = 50;
+    
+        this.turnTextObjects = this.initiative.map((char, index) => {
+            return this.add.text(uiX, uiY + index * 30, char.name, {
+                fontSize: '20px',
+                color: '#000000',
+                backgroundColor: index === 0 ? '#ff0000' : '#FFFFFF' // Highlight current turn
+            });
+        });
+    }
 
     setupCharacters(): void {
 
-    //     this.add.sprite(125, 200, 'wizard')
-    // this.add.sprite(300, 600, 'barbar')
-    // this.add.sprite(800, 600, 'barbar')
-    // this.add.sprite(800, 200, 'barbar')
 
         this.initiative.forEach((char, i) => {
+
+            //what is in char?
             char.sprite = this.add.sprite(char.x, char.y, (i == 0 ? 'wizard':'barbar')).setInteractive();
             
             char.sprite.on('pointerdown', () => {
@@ -131,7 +106,23 @@ export class Game extends Scene
         this.selectedCharacter = this.initiative[this.currentTurnIndex];
         this.selectedCharacter.sprite?.setTint(0xffff00);
 
+        this.turnTextObjects.forEach((text, index) => {
+            if (index === this.currentTurnIndex) {
+                text.setBackgroundColor('#ffff00'); // Highlight active turn
+            } else {
+                text.setBackgroundColor('#000000');
+            }
+        });
         
+        this.turnTextObjects.forEach((text, index) => {
+            text.setBackgroundColor(index === this.currentTurnIndex ? '#ffff00' : '#000000');
+        });
+
+        if (!this.selectedCharacter.isPlayer) {
+            this.takeTurn(this.selectedCharacter);
+        }
+
+
         EventBus.emit('current-scene-ready', this);
 
     }
@@ -159,6 +150,38 @@ export class Game extends Scene
 
     isCurrentTurn(char: Character): boolean {
         return this.initiative[this.currentTurnIndex] === char;
+    }
+
+    // enemy logic
+    takeTurn(enemy: any): void {
+        console.log(`${enemy.name} is taking its turn.`);
+
+        // Example AI: Move toward the player if within range
+        const player = this.initiative.find((char: any) => char.isPlayer);
+
+        if (player) {
+            Game.moveTowards(enemy, player);
+        }
+
+        // End turn after movement/action
+
+            this.endTurn();
+
+    }
+
+    static moveTowards(enemy: any, target: any) {
+        const distanceX = target.x - enemy.x;
+        const distanceY = target.y - enemy.y;
+        const moveDistance = 64; // Move 1 tile per turn
+
+        // Move closer to the player in X or Y direction
+        if (Math.abs(distanceX) > Math.abs(distanceY)) {
+            enemy.x += Math.sign(distanceX) * moveDistance;
+        } else {
+            enemy.y += Math.sign(distanceY) * moveDistance;
+        }
+
+        enemy.sprite?.setPosition(enemy.x, enemy.y);
     }
 
     changeScene ()
