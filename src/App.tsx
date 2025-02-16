@@ -59,7 +59,7 @@ function App()
                 //  `add.sprite` is a Phaser GameObjectFactory method and it returns a Sprite Game Object instance
                 const star = scene.add.sprite(x, y, 'star');
     
-                
+
                 //  ... which you can then act upon. Here we create a Phaser Tween to fade the star sprite in and out.
                 //  You could, of course, do this from within the Phaser Scene code, but this is just an example
                 //  showing that Phaser objects and systems can be acted upon from outside of Phaser itself.
@@ -89,14 +89,14 @@ function App()
                     <button className="button" onClick={changeScene}>Change Scene</button>
                 </div>
                 <div>
-                    <button disabled={canMoveSprite} className="button" onClick={moveSprite}>Toggle Movement</button>
+                    {/* <button disabled={canMoveSprite} className="button" onClick={moveSprite}>Toggle Movement</button> */}
                 </div>
-                <div className="spritePosition">Sprite Position:
+                {/* <div className="spritePosition">Sprite Position:
                     <pre>{`{\n  x: ${spritePosition.x}\n  y: ${spritePosition.y}\n}`}</pre>
-                </div>
-                <div>
+                </div> */}
+                {/* <div>
                     <button className="button" onClick={addSprite}>Add New Sprite</button>
-                </div>
+                </div> */}
             </div>
         </div>
     )
