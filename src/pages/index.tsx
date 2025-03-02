@@ -17,7 +17,7 @@ export default function Home() {
                 <link rel="icon" href="/favicon.png" />
             </Head>
             <main className={`${styles.main} ${inter.className}`}>
-                <AppWithoutSSR />
+                <div className="test"><AppWithoutSSR /></div>
             </main>
         </>
     );
