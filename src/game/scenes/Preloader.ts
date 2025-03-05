@@ -37,6 +37,14 @@ export class Preloader extends Scene
         this.load.image('wizard','wiz.png');
         this.load.image('barbar','barbar.png')
         this.load.image('hex','hex.png')
+        // this.load.spritesheet('player-attack', 'assets/player_attack.png', { frameWidth: 64, frameHeight: 64 });
+        // this.anims.create({
+        //     key: 'player-attack',
+        //     frames: this.anims.generateFrameNumbers('player-attack', { start: 0, end: 5 }),
+        //     frameRate: 10,
+        //     repeat: 0
+        // });
+
     }
 
     create ()

@@ -122,34 +122,11 @@ export class Game extends Scene
             return this.add.text(uiX, uiY + index * 30,  this.getCharacterStatusText(char, index), {
                 fontSize: '20px',
                 color: '#FF0000',
-                backgroundColor: index === 0 ? '#ff0000' : '#FFFFFF' // Highlight current turn
+                backgroundColor: index === 0 ? '#00ff00' : '#FFFFFF' // Highlight current turn
             });
         });
     }
 
-    // updateTurnUI(): void {
-
-    //     this.turnTextObjects = this.initiative.map((char, index) => {
-    //             return this.add.text(800, 50 + index * 30,  this.getCharacterStatusText(char, index), {
-    //                 fontSize: '20px',
-    //                 color: '#FF0000',
-    //                 backgroundColor: index === 0 ? '#ff0000' : '#FFFFFF' // Highlight current turn
-    //          });
-    //     });
-    //     debugger;
-    //     this.turnTextObjects.forEach((textObj, index) => {
-    //         const char = this.initiative[index];
-    //         if (char.currentHealth > 0) {
-    //             textObj.setText(this.getCharacterStatusText(char, index));
-    
-    //             // Highlight active character
-    //             textObj.setStyle({
-    //                 backgroundColor: index === 0 ? '#ff9999' : '#FFFFFF'
-    //             });
-    //         }
-           
-    //     });
-    // }
 
     // generate initiative card text
     getCharacterStatusText(char: any, index: number): string {
@@ -206,12 +183,12 @@ export class Game extends Scene
 
     
 
-    // Improve visibility
-    attackButton.setPadding(10).setStyle({ backgroundColor: '#ff0000' });
-    defendButton.setPadding(10).setStyle({ backgroundColor: '#00ff00' });
-    skillButton.setPadding(10).setStyle({ backgroundColor: '#0000ff' });
-    moveButton.setPadding(10).setStyle({ backgroundColor: '#0000ff' });
-    endTurnButton.setPadding(10).setStyle({ backgroundColor: '#bd0000' });
+        // Improve visibility of buttons
+        attackButton.setPadding(10).setStyle({ backgroundColor: '#ff0000' });
+        defendButton.setPadding(10).setStyle({ backgroundColor: '#00ff00' });
+        skillButton.setPadding(10).setStyle({ backgroundColor: '#0000ff' });
+        moveButton.setPadding(10).setStyle({ backgroundColor: '#0000ff' });
+        endTurnButton.setPadding(10).setStyle({ backgroundColor: '#bd0000' });
 
 
     }
@@ -326,7 +303,9 @@ export class Game extends Scene
             player.y = targetX;
             player.currentDistance -= distance;
             this.selectedCharacter.sprite?.setPosition(targetX, targetY);
-            this.highlightValidMovementTiles(); // 🔥 Highlight valid tiles    
+            this.isMoving = !this.isMoving
+            this.movementHighlightLayer.clear(); // Remove old highlights
+            // this.highlightValidMovementTiles(); // 🔥 Highlight valid tiles    
             this.createTurnUI(); // Refresh UI after moving
         } else {
             // console.log("Not enough movement left!");
@@ -387,26 +366,40 @@ export class Game extends Scene
     
         // Select the first adjacent enemy to attack
         const target = adjacentEnemies[0];
-    
-        // Calculate damage
-        const damage = Math.max(player.attack - target.defense, 1);
-        target.currentHealth -= damage;
-        console.log('brought opponent down to health level ' + target.currentHealth)
-    
-        console.log(`${player.name} attacks ${target.name} for ${damage} damage!`);
-        
-        // Check if the enemy is defeated
-        if (target.currentHealth <= 0) {
-            console.log(`${target.name} has been defeated!`);
-            debugger;
-            target.sprite?.destroy()
-            this.initiative = this.initiative.filter(char => char.currentHealth > 0);
 
-            this.checkWinConditions();
-        }
+        // slight shake of player 
+        this.tweens.add({
+            targets: player.sprite,
+            x: player.x + 5, // Small movement to the right
+            yoyo: true,
+            duration: 50,
+            repeat: 2
+        });
+        
+        this.time.delayedCall(200, () => {
+            // Flash enemy sprite red
+            const originalTint = target.sprite?.tint;
+            target.sprite?.setTint(0xff0000);
     
-        this.createTurnUI();
-        // this.endTurn(); // Move to the next turn after attack
+            this.time.delayedCall(150, () => {
+                target.sprite?.clearTint(); // Remove tint after flash
+            });
+    
+            // Calculate damage
+            const damage = Math.max(player.attack - target.defense, 1);
+            target.currentHealth -= damage;
+            console.log(`${player.name} attacks ${target.name} for ${damage} damage!`);
+    
+            // Check if the enemy is defeated
+            if (target.currentHealth <= 0) {
+                console.log(`${target.name} has been defeated!`);
+                target.sprite?.destroy();
+                this.initiative = this.initiative.filter(char => char.currentHealth > 0);
+                this.checkWinConditions();
+            }
+    
+            this.createTurnUI();
+        });
     }
 
 
