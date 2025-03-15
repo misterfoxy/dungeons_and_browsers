@@ -1,5 +1,6 @@
 import { Boot } from './scenes/Boot';
 import { GameOver } from './scenes/GameOver';
+import {YouWin} from './scenes/YouWin';
 import { Rules } from './scenes/Rules';
 import { Game as MainGame } from './scenes/Game';
 import { MainMenu } from './scenes/MainMenu';
@@ -10,17 +11,21 @@ import { Preloader } from './scenes/Preloader';
 //  https://newdocs.phaser.io/docs/3.70.0/Phaser.Types.Core.GameConfig
 const config: Phaser.Types.Core.GameConfig = {
     type: AUTO,
-    width: 1024,
-    height: 768,
+    width: 1200,
+    height: 800,
     parent: 'game-container',
     backgroundColor: '#028af8',
+    audio: {
+        disableWebAudio: false
+    },
     scene: [
         Boot,
         Preloader,
         MainMenu,
-        MainGame,
         Rules,
-        GameOver
+        MainGame,
+        GameOver,
+        YouWin
     ]
 };
 

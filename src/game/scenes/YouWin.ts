@@ -1,7 +1,7 @@
 import { EventBus } from '../EventBus';
 import { Scene } from 'phaser';
 
-export class GameOver extends Scene
+export class YouWin extends Scene
 {
     camera: Phaser.Cameras.Scene2D.Camera;
     background: Phaser.GameObjects.Image;
@@ -9,7 +9,7 @@ export class GameOver extends Scene
 
     constructor ()
     {
-        super('GameOver');
+        super('YouWin');
     }
 
     create ()
@@ -20,7 +20,7 @@ export class GameOver extends Scene
         this.background = this.add.image(512, 384, 'background');
         this.background.setAlpha(0.5);
 
-        this.gameOverText = this.add.text(512, 384, 'YOU DIED', {
+        this.gameOverText = this.add.text(512, 384, 'YOU WIN', {
             fontFamily: 'Arial Black', fontSize: 64, color: '#ffffff',
             stroke: '#000000', strokeThickness: 8,
             align: 'center'

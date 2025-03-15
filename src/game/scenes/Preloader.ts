@@ -37,6 +37,11 @@ export class Preloader extends Scene
         this.load.image('wizard','wiz.png');
         this.load.image('barbar','barbar.png')
         this.load.image('hex','hex.png')
+        this.load.audio("bgMusic", 'song18.mp3');
+        this.load.audio("attack_fx",'knife.flac');
+        this.load.audio("death_fx",'Death.wav');
+        this.load.audio("steps_fx",'steps.flac')
+
         // this.load.spritesheet('player-attack', 'assets/player_attack.png', { frameWidth: 64, frameHeight: 64 });
         // this.anims.create({
         //     key: 'player-attack',
@@ -53,6 +58,12 @@ export class Preloader extends Scene
         //  For example, you can define global animations here, so we can use them in other scenes.
 
         //  Move to the MainMenu. You could also swap this for a Scene Transition, such as a camera fade.
+        if (this.cache.audio.has("bgMusic")) {
+            console.log("bgMusic is loaded!");
+            this.scene.start("GameScene"); // Now it's safe to switch scenes
+        } else {
+            console.error("bgMusic failed to load!");
+        }
         this.scene.start('MainMenu');
     }
 }
