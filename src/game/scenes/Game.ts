@@ -1,8 +1,11 @@
 import { EventBus } from '../EventBus';
 import { Scene } from 'phaser';
+import { io, Socket} from 'socket.io-client';
+
 
 interface Character {
     name: string;
+    id: string,
     initiative: number;
     x: number;
     y: number;
@@ -45,6 +48,7 @@ export class Game extends Scene
     private gameOver: boolean = false;
     private playerWon: boolean = false;
 
+    private socket!: Socket;
 
 
 
@@ -52,6 +56,8 @@ export class Game extends Scene
     {
 
         super({key:'Game'});
+        const socket = io('http://localhost:3003');
+
 
     }
 
@@ -66,6 +72,34 @@ export class Game extends Scene
         this.createSkillUI()
         // this.startMusic();
         this.startTurn();
+
+        this.socket = io('http://localhost:3003');
+
+        this.socket.on('connect', () => {
+            console.log('Connected to server');
+        });
+
+        this.socket.emit('joinGame', 'room-123'); // Example room ID
+
+        this.socket.on('updateGameState', (data) => {
+            console.log('Game state updated:', data);
+            // Update local state based on received data
+        });
+
+        
+        this.socket.emit('createGame');
+        
+        this.socket.on('gameCreated', (gameId) => {
+            console.log(`Game created with ID: ${gameId}`);
+        });
+        
+        this.socket.on('playerJoined', (game) => {
+            console.log('Player joined:', game);
+        });
+        
+        this.socket.on('updateState', (newState) => {
+            console.log('Game state updated:', newState);
+        });
 
 
         
@@ -100,10 +134,10 @@ export class Game extends Scene
     generateInitiative(): void {
 
         this.initiative = [
-            { name: "Player 1", x: 200, y: 350, distance: 5, actionCount:2,currentActionCount:2,bonusActionCount: 1, currentBonusActionCount:1, currentDistance: 5, attack: 20, defense: 5, currentHealth: 50, health: 50, initiative: Math.random() * 20, isPlayer:true, defeated:false },
-            { name: "Enemy 1", x: 150, y: 150, distance: 5,actionCount:1,currentActionCount:1,bonusActionCount: 1, currentBonusActionCount:1, currentDistance: 5, attack: 10, defense: 5, currentHealth: 20,health: 20, initiative: Math.random() * 20, isPlayer:false, defeated:false },
-            { name: "Enemy 2", x: 500, y: 200, distance: 5,actionCount:1,currentActionCount:1,bonusActionCount: 1, currentBonusActionCount:1, currentDistance: 5, attack: 10, defense: 5, currentHealth: 20,health: 20, initiative: Math.random() * 20, isPlayer:false, defeated:false },
-            { name: "Enemy 3", x: 350, y: 150, distance: 5,actionCount:1,currentActionCount:1,bonusActionCount: 1, currentBonusActionCount:1, currentDistance: 5, attack: 10, defense: 5, currentHealth: 20, health: 20,initiative: Math.random() * 20, isPlayer:false, defeated:false }
+            { name: "Player 1", id:0, x: 200, y: 350, distance: 5, actionCount:2,currentActionCount:2,bonusActionCount: 1, currentBonusActionCount:1, currentDistance: 5, attack: 20, defense: 5, currentHealth: 50, health: 50, initiative: Math.random() * 20, isPlayer:true, defeated:false },
+            { name: "Enemy 1", id:1, x: 150, y: 150, distance: 5,actionCount:1,currentActionCount:1,bonusActionCount: 1, currentBonusActionCount:1, currentDistance: 5, attack: 10, defense: 5, currentHealth: 20,health: 20, initiative: Math.random() * 20, isPlayer:false, defeated:false },
+            { name: "Enemy 2", id:2, x: 500, y: 200, distance: 5,actionCount:1,currentActionCount:1,bonusActionCount: 1, currentBonusActionCount:1, currentDistance: 5, attack: 10, defense: 5, currentHealth: 20,health: 20, initiative: Math.random() * 20, isPlayer:false, defeated:false },
+            { name: "Enemy 3", id:3, x: 350, y: 150, distance: 5,actionCount:1,currentActionCount:1,bonusActionCount: 1, currentBonusActionCount:1, currentDistance: 5, attack: 10, defense: 5, currentHealth: 20, health: 20,initiative: Math.random() * 20, isPlayer:false, defeated:false }
         ].sort((a, b) => b.initiative - a.initiative);
        
     }
@@ -356,8 +390,9 @@ export class Game extends Scene
         const player = this.selectedCharacter; // Assuming player is first in initiative
         if (!player) return;
     
+
         this.isMoving = true; // Enable movement mode
-        
+        this.socket.emit('playerMove',{currentx:player.x,currenty:player.y})
         this.highlightValidMovementTiles(); // 🔥 Highlight valid tiles    
     }
 
@@ -472,6 +507,14 @@ export class Game extends Scene
     playerAttack(): void {
         const player = this.selectedCharacter;
         if (!player || !player.isPlayer || player.currentActionCount==0) return; 
+        
+        const data = {
+            roomId: 'room-123', 
+            action: 'attack',
+            targetId: this.selectedCharacter.id
+        };
+    
+        this.socket.emit('playerAction', data);
 
     // Set a flag to track attack mode
         this.isAttacking = true;

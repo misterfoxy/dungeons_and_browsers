@@ -28,12 +28,16 @@
         "build-nolog": "next build"
     },
     "dependencies": {
+        "express": "^4.21.2",
         "next": "14.2.3",
         "phaser": "^3.87.0",
         "react": "^18",
-        "react-dom": "^18"
+        "react-dom": "^18",
+        "socket.io": "^4.8.1",
+        "socket.io-client": "^4.8.1"
     },
     "devDependencies": {
+        "@types/express": "^5.0.0",
         "@types/node": "^20",
         "@types/react": "^18",
         "@types/react-dom": "^18",
