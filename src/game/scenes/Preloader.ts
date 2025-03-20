@@ -59,7 +59,6 @@ export class Preloader extends Scene
 
         //  Move to the MainMenu. You could also swap this for a Scene Transition, such as a camera fade.
         if (this.cache.audio.has("bgMusic")) {
-            console.log("bgMusic is loaded!");
             this.scene.start("GameScene"); // Now it's safe to switch scenes
         } else {
             console.error("bgMusic failed to load!");

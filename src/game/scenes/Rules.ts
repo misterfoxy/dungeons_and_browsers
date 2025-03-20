@@ -21,7 +21,7 @@ export class Rules extends Scene
         this.background.setAlpha(0.5);
 
         
-        this.gameText = this.add.text(512, 384, 'Defeat the enemies before they defeat you. Choose your character.', {
+        this.gameText = this.add.text(512, 384, 'Waiting for players...', {
             fontFamily: 'Arial Black', fontSize: 38, color: '#ffffff',
             stroke: '#000000', strokeThickness: 8,
             align: 'center'

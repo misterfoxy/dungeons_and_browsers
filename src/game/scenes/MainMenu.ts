@@ -20,11 +20,28 @@ export class MainMenu extends Scene
 
         this.logo = this.add.image(512, 300, 'logo').setDepth(100);
 
-        this.title = this.add.text(512, 460, 'Main Menu', {
-            fontFamily: 'Arial Black', fontSize: 38, color: '#ffffff',
-            stroke: '#000000', strokeThickness: 8,
-            align: 'center'
-        }).setOrigin(0.5).setDepth(100);
+        const buttonStyle = { fontSize: '20px', color: '#ffffff', backgroundColor: '#333333', padding: { x: 10, y: 5 } };
+
+        const playSingle = this.add.text(300, 500, "Play Single Player", buttonStyle)
+        .setInteractive()
+        .on('pointerover', () => {
+            playSingle.setBackgroundColor('#00ff00');  // Change to green on hover
+        })
+        .on('pointerout', () => {
+            playSingle.setBackgroundColor('#ff0000');  // Revert to red when not hovering
+        })
+        .on('pointerdown', () =>  this.scene.start('Game'));
+
+        const playMulti = this.add.text(600, 500, "Play Multi Player", buttonStyle)
+        .setInteractive()
+        .on('pointerover', () => {
+            playMulti.setBackgroundColor('#00ff00');  // Change to green on hover
+        })
+        .on('playMulti', () => {
+            playSingle.setBackgroundColor('#ff0000');  // Revert to red when not hovering
+        })
+        .on('pointerdown', () =>  this.scene.start('Rules'));
+    
 
         EventBus.emit('current-scene-ready', this);
     }

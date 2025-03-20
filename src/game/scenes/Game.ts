@@ -49,66 +49,111 @@ export class Game extends Scene
     private playerWon: boolean = false;
 
     private socket!: Socket;
-
-
+    private spriteMap: Map<string, Phaser.GameObjects.Sprite> = new Map();
 
     constructor ()
     {
-
         super({key:'Game'});
         const socket = io('http://localhost:3003');
-
 
     }
 
     create ()
     {
 
-
-        this.generateMap();
-        this.generateInitiative();
-        this.setupCharacters();
-        this.createTurnUI();
-        this.createSkillUI()
-        // this.startMusic();
-        this.startTurn();
-
         this.socket = io('http://localhost:3003');
 
         this.socket.on('connect', () => {
-            console.log('Connected to server');
+            console.log('---');
         });
+     
+        const gameStartPayload = {
+            players: [
+                { name: "Player 1", id:0, x: 200, y: 350, distance: 5, actionCount:2,currentActionCount:2,bonusActionCount: 1, currentBonusActionCount:1, currentDistance: 5, attack: 20, defense: 5, currentHealth: 50, health: 50, initiative: Math.random() * 20, isPlayer:true, defeated:false },
+                { name: "Player 2", id:10, x: 300, y: 350, distance: 5, actionCount:2,currentActionCount:2,bonusActionCount: 1, currentBonusActionCount:1, currentDistance: 5, attack: 20, defense: 5, currentHealth: 50, health: 50, initiative: Math.random() * 20, isPlayer:true, defeated:false },
 
-        this.socket.emit('joinGame', 'room-123'); // Example room ID
-
-        this.socket.on('updateGameState', (data) => {
-            console.log('Game state updated:', data);
-            // Update local state based on received data
-        });
-
+            ],
+            map: 'map0'
+        }
+        this.socket.emit('createGame',gameStartPayload);
         
-        this.socket.emit('createGame');
-        
-        this.socket.on('gameCreated', (gameId) => {
-            console.log(`Game created with ID: ${gameId}`);
+        this.socket.on('gameCreated', (gameState) => {
+            this.initiative = gameState.initiative;
+
+            this.generateMap();
+            this.setupCharacters();
+            this.createTurnUI();
+            this.createSkillUI()
+            // this.startMusic();
+            this.startTurn();
         });
         
         this.socket.on('playerJoined', (game) => {
             console.log('Player joined:', game);
         });
+
         
-        this.socket.on('updateState', (newState) => {
-            console.log('Game state updated:', newState);
+        
+        this.socket.off('stateUpdate'); // Ensure no duplicate listeners
+        this.socket.on('stateUpdate', (newState) => {
+            this.initiative = newState.initiative;
+
+            this.initiative.forEach((char) => {
+                if (char.sprite) {
+                    char.sprite.setPosition(char.x, char.y); // Update sprite position
+                }
+            });
+        
+            if (newState.lastAttack) {
+                const { attackerId, targetId, damage, defeated } = newState.lastAttack;
+        
+                // Optional: Display damage or animation feedback
+                const attacker = this.initiative.find(c => c.id === attackerId);
+                const target = this.initiative.find(c => c.id === targetId);
+        
+                if (attacker && target) {
+                    this.tweens.add({
+                        targets: attacker.sprite,
+                        x: attacker.x + 5, // Small shake effect
+                        yoyo: true,
+                        duration: 50,
+                        repeat: 2
+                    });
+        
+                    this.time.delayedCall(200, () => {
+                        // Flash target sprite red
+                        target.sprite?.setTint(0xff0000);
+                        this.sound.play('attack_fx');
+                        this.time.delayedCall(150, () => target.sprite?.clearTint());
+                    });
+        
+                    if (defeated) {
+                        target.sprite?.destroy();
+                    }
+                }
+
+                this.setupCharacters(); // Keep characters in sync with the new state
+              
+    
+            }
+            this.createTurnUI(); // Update UI
         });
 
-
-        
+        this.socket.on('gameOver', (data) => {
+            if (data.winner === 'players') {
+                this.scene.start('YouWin');
+            } else if (data.winner === 'enemies') {
+                this.scene.start('GameOver');
+            }
+        });
 
     }
 
     // build map and interactivity
     generateMap(){
 
+
+        
         for (let row = 0; row < this.rows; row++) {
             for (let col = 0; col < this.cols; col++) {
                 let x = col * this.gridSize + 100;
@@ -128,18 +173,6 @@ export class Game extends Scene
         this.movementHighlightLayer.setDepth(100); // Ensure highlights appear above hex images
 
         
-    }
-
-    // create characters and stats
-    generateInitiative(): void {
-
-        this.initiative = [
-            { name: "Player 1", id:0, x: 200, y: 350, distance: 5, actionCount:2,currentActionCount:2,bonusActionCount: 1, currentBonusActionCount:1, currentDistance: 5, attack: 20, defense: 5, currentHealth: 50, health: 50, initiative: Math.random() * 20, isPlayer:true, defeated:false },
-            { name: "Enemy 1", id:1, x: 150, y: 150, distance: 5,actionCount:1,currentActionCount:1,bonusActionCount: 1, currentBonusActionCount:1, currentDistance: 5, attack: 10, defense: 5, currentHealth: 20,health: 20, initiative: Math.random() * 20, isPlayer:false, defeated:false },
-            { name: "Enemy 2", id:2, x: 500, y: 200, distance: 5,actionCount:1,currentActionCount:1,bonusActionCount: 1, currentBonusActionCount:1, currentDistance: 5, attack: 10, defense: 5, currentHealth: 20,health: 20, initiative: Math.random() * 20, isPlayer:false, defeated:false },
-            { name: "Enemy 3", id:3, x: 350, y: 150, distance: 5,actionCount:1,currentActionCount:1,bonusActionCount: 1, currentBonusActionCount:1, currentDistance: 5, attack: 10, defense: 5, currentHealth: 20, health: 20,initiative: Math.random() * 20, isPlayer:false, defeated:false }
-        ].sort((a, b) => b.initiative - a.initiative);
-       
     }
 
     // div for displaying current turn
@@ -274,20 +307,32 @@ export class Game extends Scene
     }
     // put character sprites on map
     setupCharacters(): void {
-
         this.initiative.forEach((char, i) => {
-            
-            char.sprite = this.add.sprite(char.x, char.y, (char.isPlayer == true ? 'wizard':'barbar')).setInteractive();
-            
-            // char.sprite.on('pointerdown', () => {
-                
-                
-            //     if (this.isCurrentTurn(char)) {
-            //         this.selectedCharacter = char;
-            //     }
-            // });
 
-            char.sprite.on("pointerdown", () => this.handleEnemyClick(char));
+            let sprite = this.spriteMap.get(char.id);
+            if (!sprite) {
+                // Create a new sprite if none exists for this character ID
+                sprite = this.add.sprite(char.x, char.y, char.isPlayer ? 'wizard' : 'barbar').setInteractive();
+    
+                // Store in map
+                this.spriteMap.set(char.id, sprite);
+    
+                sprite.on('pointerdown', () => this.handleEnemyClick(char));
+            } else {
+                // Just update position if sprite already exists
+                sprite.setPosition(char.x, char.y);
+            }
+    
+            // Link the existing sprite back to the character object
+            char.sprite = sprite;
+        });
+    
+        // Clean up any stale sprites (e.g., for defeated characters)
+        this.spriteMap.forEach((sprite, id) => {
+            if (!this.initiative.some(char => char.id === id)) {
+                sprite.destroy(); // Remove sprite if no longer in the initiative
+                this.spriteMap.delete(id);
+            }
         });
     }
 
@@ -303,62 +348,17 @@ export class Game extends Scene
         
         const distance = (Math.max(Math.abs(player.x - target.x), Math.abs(player.y - target.y))/this.gridSize);
 
-        if (distance > 2){
-            console.log("too far, move closer")
-            return;
-        }
 
-        // attacking and damage logic
-
-        this.tweens.add({
-            targets: player.sprite,
-            x: player.x + 5, // Small movement to the right
-            yoyo: true,
-            duration: 50,
-            repeat: 2
-        });
-
-        this.time.delayedCall(200, () => {
-            // Flash enemy sprite red
-            const originalTint = target.sprite?.tint;
-            target.sprite?.setTint(0xff0000);
-            this.sound.play('attack_fx');
-
+        this.socket.emit(
+            'playerAttack',
+             {attackerId: player.id, targetId: target.id, distance: distance})
     
-            this.time.delayedCall(150, () => {
-                target.sprite?.clearTint(); // Remove tint after flash
-                this.clearAttackHighlights();
-
-            });
-    
-            // Calculate damage
-            const damage = Math.max(player.attack - target.defense, 1);
-            target.currentHealth -= damage;
-            player.currentActionCount -= 1;
-            console.log(`${player.name} attacks ${target.name} for ${damage} damage!`);
-            
-            // remove "attack mode"
-            this.isAttacking = false
-
-    
-            // Check if the enemy is defeated
-            if (target.currentHealth <= 0) {
-                console.log(`${target.name} has been defeated!`);
-                target.sprite?.destroy();
-                this.initiative = this.initiative.filter(char => char.currentHealth > 0);
-                this.checkWinConditions();
-            }
-    
-            this.createTurnUI();
-    });
-
-
     }
 
 
     // highlight current player. if COM player, execute enemyAI logic
     startTurn(): void {
-      
+
         this.initiative.forEach((char) => {
             char.sprite?.clearTint(); // Remove tint from all characters
         });
@@ -378,22 +378,25 @@ export class Game extends Scene
             text.setBackgroundColor(index === this.currentTurnIndex ? '#ffff00' : '#000000');
         });
 
-        if (!this.selectedCharacter.isPlayer) {
-            this.takeTurn(this.selectedCharacter);
-        }
+
+        this.socket.emit('startTurn', this.initiative[this.currentTurnIndex].id);
+       
+        // if (!this.selectedCharacter.isPlayer) {
+        //     this.takeTurn(this.selectedCharacter);
+        // }
 
         EventBus.emit('current-scene-ready', this);
 
     }
 
     engageMovement(): void {
-        const player = this.selectedCharacter; // Assuming player is first in initiative
-        if (!player) return;
-    
 
+        this.isAttacking = false;
         this.isMoving = true; // Enable movement mode
-        this.socket.emit('playerMove',{currentx:player.x,currenty:player.y})
-        this.highlightValidMovementTiles(); // 🔥 Highlight valid tiles    
+
+        this.clearAttackHighlights();
+        this.highlightValidMovementTiles(); 
+
     }
 
     highlightValidMovementTiles(): void {
@@ -413,8 +416,7 @@ export class Game extends Scene
                 const targetX = player.x + (dx * tileSize);
                 const targetY = player.y + (dy * tileSize);
 
-                // console.log(`targetX: ${targetX}`)
-                // console.log(`targetY: ${targetY}`)
+            
     
                 // Ensure within movement range using euclid distance
                 if (
@@ -446,23 +448,42 @@ export class Game extends Scene
 
         if (!this.isMoving) return; // Only move if in movement mode
 
-        const player = this.selectedCharacter; // Get active player
-
-        const distance = Math.max(Math.abs(targetX - player.x) / this.gridSize,Math.abs(targetY - player.y) / this.gridSize);
+        this.socket.emit('playerMove',{char: this.selectedCharacter, currentx:this.selectedCharacter.x,currenty:this.selectedCharacter.y,targetx:targetX,targety:targetY},
+            (response: any) => {
+                if (response.success){
+                    this.sound.play('steps_fx');
+                    this.selectedCharacter.currentDistance = response.player.currentDistance;
+                    this.selectedCharacter.x = targetX;
+                    this.selectedCharacter.y = targetY;
         
+                    this.selectedCharacter.sprite?.setPosition(targetX, targetY);
+                    this.isMoving = !this.isMoving
+                    this.movementHighlightLayer.clear(); // Remove old highlights
+                    this.createTurnUI(); // Refresh UI after moving
+                }
+                else{
+                    console.log('invalid move, try again')
 
-        if (distance <= player.currentDistance) {
-            this.sound.play('steps_fx');
-            player.x = targetX;
-            player.y = targetY;
-            player.currentDistance -= distance;
-            this.selectedCharacter.sprite?.setPosition(targetX, targetY);
-            this.isMoving = !this.isMoving
-            this.movementHighlightLayer.clear(); // Remove old highlights
-            this.createTurnUI(); // Refresh UI after moving
-        } else {
-            console.log("Not enough movement left!");
-        }
+                }
+            }
+        )
+        
+        // this.socket.on('invalidMove', (data) => {
+        //     console.log('invalid move, try again')
+        // });
+
+        // this.socket.on('validMove', (data) => {
+
+        //     this.sound.play('steps_fx');
+        //     this.selectedCharacter.currentDistance = data.player.currentDistance;
+        //     this.selectedCharacter.x = targetX;
+        //     this.selectedCharacter.y = targetY;
+
+        //     this.selectedCharacter.sprite?.setPosition(targetX, targetY);
+        //     this.isMoving = !this.isMoving
+        //     this.movementHighlightLayer.clear(); // Remove old highlights
+        //     this.createTurnUI(); // Refresh UI after moving
+        // })
         
     }
 
@@ -470,6 +491,7 @@ export class Game extends Scene
     endTurn(): void {
         this.currentTurnIndex = (this.currentTurnIndex + 1) % this.initiative.length;
         this.isMoving = false; // Disable movement mode
+        this.isAttacking = false;
         this.movementHighlightLayer.clear(); // Remove previous highlights
         this.selectedCharacter.currentDistance = this.selectedCharacter.distance
         this.selectedCharacter.currentActionCount = this.selectedCharacter.actionCount;
@@ -484,28 +506,28 @@ export class Game extends Scene
     }
 
     // enemy logic
-    takeTurn(enemy: any): void {
-        console.log(`${enemy.name} is taking its turn.`);
+    // takeTurn(enemy: any): void {
 
-        // Example AI: Move toward the player if within range
-        const player = this.initiative.find((char: any) => char.isPlayer);
+    //     // Example AI: Move toward the player if within range
+    //     const player = this.initiative.find((char: any) => char.isPlayer);
 
-        if (player) {
-            this.moveTowards(enemy, player);
-        }
+    //     if (player) {
+    //         this.moveTowards(enemy, player);
+    //     }
 
-        // End turn after movement/action
-        setTimeout(() => {
+    //     // End turn after movement/action
+    //     setTimeout(() => {
 
-            this.endTurn();
+    //         this.endTurn();
 
-        },1000)
+    //     },1000)
 
-    }
+    // }
 
     // attack enemy
     playerAttack(): void {
         const player = this.selectedCharacter;
+        this.isMoving = false; // Disable movement mode
         if (!player || !player.isPlayer || player.currentActionCount==0) return; 
         
         const data = {
@@ -522,8 +544,6 @@ export class Game extends Scene
     // Highlight valid attack range (Optional UI improvement)
         this.highlightAttackableEnemies(player);
     
-        
-        
     }
 
     highlightAttackableEnemies(player: Character): void {
@@ -549,84 +569,11 @@ export class Game extends Scene
         });
     }
 
-    handleAttack(player: any, target: any): void{
-
-        const distance = Phaser.Math.Distance.Between(player.x, player.y, target.x, target.y);
-        if (distance > this.gridSize + 10) { // Small buffer for precision
-            console.log('Target is too far away!');
-            return;
-        }
-
-        console.log(`${player.name} attacks ${target.name}!`);
-
-        // Shake player sprite to indicate attack
-        this.tweens.add({
-            targets: player.sprite,
-            x: player.x + 5,
-            yoyo: true,
-            duration: 50,
-            repeat: 2
-        });
-    
-        // Delay damage for better animation timing
-        this.time.delayedCall(200, () => {
-            // Flash the enemy sprite red briefly
-            const originalTint = target.sprite.tint;
-            target.sprite.setTint(0xff0000);
-            this.time.delayedCall(150, () => target.sprite.clearTint());
-    
-            // Calculate and apply damage
-            const damage = Math.max(player.attack - target.defense, 1);
-            target.currentHealth -= damage;
-            console.log(`${target.name} takes ${damage} damage!`);
-    
-            // Check if the enemy is defeated
-            if (target.currentHealth <= 0) {
-                console.log(`${target.name} has been defeated!`);
-                this.sound.play('death_fx');
-
-                target.sprite?.destroy();
-                this.initiative = this.initiative.filter(char => char.currentHealth > 0);
-                this.checkWinConditions();
-            }
-    
-            this.createTurnUI();
-    
-            // Remove event listeners after attack
-            this.initiative.forEach(character => character.sprite?.off('pointerdown'));
-    
-        });
-
-    }
-    playerDefend(): void {
-        console.log('defending')
-    }
 
     playerUseSkill(): void {
         console.log("skill")
     }
 
-    checkWinConditions(): void {
-        // if any values in initiative exist where isPlayer = false, the game is not won yet
-
-        if(this.initiative.filter(character => character.isPlayer).length === 0){
-            
-            this.playerWon = true;
-            this.gameOver = true;
-            this.scene.start('GameOver');
-
-        }
-        
-        else if(this.initiative.length < 2 && this.initiative[0].isPlayer === true){
-            
-            this.playerWon = true;
-            this.gameOver = true;
-            this.scene.start('YouWin');
-
-        }
-
-    }
-    
 
     moveTowards(enemy: any, target: any): void {
 
@@ -661,7 +608,6 @@ export class Game extends Scene
     enemyAttack(enemy: any, target: any): void {
         // find player character
         // attack player character
-        debugger;
         // attacking and damage logic
 
         this.tweens.add({
@@ -697,7 +643,6 @@ export class Game extends Scene
                 console.log(`${target.name} has been defeated!`);
                 target.sprite?.destroy();
                 this.initiative = this.initiative.filter(char => char.currentHealth > 0);
-                this.checkWinConditions();
             }
     
             this.createTurnUI();
