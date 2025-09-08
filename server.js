@@ -19,14 +19,15 @@ const gameState = {
     gridSize: 50,
     rows: 14,
     cols: 14,
-    turnIndex: 0, // Whose turn it is in initiative order
+    currentTurnIndex: 0, // Whose turn it is in initiative order
     initiative: [],
     activePlayerId: null, // Current turn's player ID
     isMultiplayer: false, // Whether it's a single or multiplayer session
+    gameOver: false,
+    playerWon: false,
 }
 
 io.on('connection', (socket) => {
-    // console.log(`User connected: ${socket.id}`);
   // Add player to state
     gameState.players[socket.id] = {
         id: socket.id,
@@ -40,13 +41,6 @@ io.on('connection', (socket) => {
 
     socket.on('createGame', (gameStartPayload) => {
 
-         // server receives player character count  (1 or 2)
-            // server generates game start data (map layout, character positions, initiative order) 
-            // server sends game start data to client
-            // client generates map and UI based on game start data
-            // client sends game ready message to server
-            // server sends game ready message to all clients
-        // console.log(gameStartPayload)
         const gameId = Math.random().toString(36).substr(2, 9);
         games[gameId] = {
             players: [socket.id],
@@ -65,47 +59,56 @@ io.on('connection', (socket) => {
 
     socket.on('startTurn', (data) => {
 
-        const player = gameState.initiative[gameState.turnIndex];
+        const player = gameState.initiative[gameState.currentTurnIndex];
+
         gameState.activePlayerId = player.id;
 
-        io.to(data.gameId).emit('turnStart', gameState);
+        if (!player.isPlayer){
+            console.log('Enemy turn');
+            enemyTurn(player.id);
+        }
+        else{
+            io.to(data.gameId).emit('turnStart', gameState);
+
+        }
+
     });
 
-    socket.on('endTurn', (data) => {
-        gameState.turnIndex = (gameState.turnIndex + 1) % gameState.initiative.length;
-        io.to(data.gameId).emit('turnEnd', gameState);
+    socket.on('endTurn', () => {
+        // gameState.currentTurnIndex = (gameState.currentTurnIndex + 1) % gameState.initiative.length;
+        // io.to(data.gameId).emit('turnEnd', gameState);
+        endTurn()
+    });
+
+
+   socket.on('playerMove', (data, callback) => {
+    // Find the character in the global initiative array
+    const charIndex = gameState.initiative.findIndex(c => c.id === data.char.id);
+    if (charIndex === -1) {
+        callback({ success: false, message: 'Character not found' });
+        return;
     }
+    const character = gameState.initiative[charIndex];
+
+    const distance = Math.max(
+        Math.abs(data.targetx - character.x) / gameState.gridSize,
+        Math.abs(data.targety - character.y) / gameState.gridSize
     );
 
+    if (distance <= character.currentDistance) {
+        // Update character position in global state
+        character.x = data.targetx;
+        character.y = data.targety;
+        character.currentDistance -= distance;
 
-    socket.on('playerMove',(data, callback) => {
-        // console.log(`Move received from ${socket.id}:`, data);
+        // Optionally emit state update to all clients
+        io.emit('stateUpdate', gameState);
 
-        const player = data.char; // Get active player
-
-        const distance = Math.max(Math.abs(data.targetx - player.x) / gameState.gridSize,Math.abs(data.targety - player.y) / gameState.gridSize);
-
-
-        if (distance <= player.currentDistance) {
-            // Update player position
-            player.x = data.targetx;
-            player.y = data.targety;
-            player.currentDistance -= distance;
-            io.emit('stateUpdate', gameState);
-            callback({success: true, player: player});
-            // socket.emit('validMove', { message: 'Successful move', player: player });
-          
-        } else {
-            callback({success: false});
-            // socket.emit('invalidMove', { message: 'Invalid move' });
-        }
-        
-
-                // this.socket.emit('playerMove',{char: this.selectedCharacter, currentx:this.selectedCharacter.x,currenty:this.selectedCharacter.y,targetx:targetX,targety:targetY})
-
-        // io.to(data.roomId).emit('updateGameState', data);
-    });
-
+        callback({ success: true, player: character });
+    } else {
+        callback({ success: false, message: 'Move too far' });
+    }
+});
     socket.on('playerAttack', ({ attackerId, targetId, distance }) => {
         const attacker = gameState.initiative.find(c => c.id === attackerId);
         const target = gameState.initiative.find(c => c.id === targetId);
@@ -129,13 +132,15 @@ io.on('connection', (socket) => {
     
         // Broadcast state update to all clients
         io.emit('stateUpdate', {
+            ...gameState,
             initiative: gameState.initiative,
             lastAttack: {
                 attackerId,
                 targetId,
                 damage,
                 defeated,
-            }
+            },
+            // currentTurnIndex: gameState.currentTurnIndex
         });
     
         // Check win conditions
@@ -148,29 +153,6 @@ io.on('connection', (socket) => {
 
     socket.on('playerAction', (data) => {
         io.to(data.roomId).emit('updateGameState', data);
-    });
-
-    socket.on('enemyTurn', (enemyId, callback) => {
-        const enemy = gameState.initiative.find(c => c.id === enemyId);
-        const player = gameState.initiative.find(c => c.isPlayer);
-    
-        if (!enemy || !player) {
-            return callback({ success: false, message: 'Invalid enemy or player not found.' });
-        }
-    
-        // Move the enemy towards the player
-        const moveResult = moveEnemyTowardsPlayer(enemy, player);
-    
-        // If the enemy is within range, attack
-        if (moveResult.success) {
-            const attackResult = enemyAttack(enemy, player);
-            callback({ success: true, moveResult, attackResult });
-        } else {
-            callback({ success: false, message: 'Enemy movement failed.' });
-        }
-    
-        // Emit updated state to all clients
-        io.emit('stateUpdate', gameState);
     });
 
 
@@ -227,6 +209,84 @@ function createEnemies(count){
     return enemies;
 }
 
+function startTurn(){
+    
+    // console.log(gameState.currentTurnIndex);
+
+    const currentPlayer = gameState.initiative[gameState.currentTurnIndex];
+
+    if (currentPlayer.isPlayer === false){
+        enemyTurn(currentPlayer.id);
+    }
+    else{
+        io.emit('stateUpdate', gameState, {startingTurn: true});
+    }
+    
+}
+
+function endTurn(){
+
+    // reset curent characters action and movement points
+    const currentCharacter = gameState.initiative[gameState.currentTurnIndex];
+    currentCharacter.currentActionCount = currentCharacter.actionCount;
+    currentCharacter.currentBonusActionCount = currentCharacter.bonusActionCount;
+    currentCharacter.currentDistance = currentCharacter.distance;
+    // get player ID of next character
+
+    gameState.currentTurnIndex = (gameState.currentTurnIndex + 1) % gameState.initiative.length;
+    // console.log(`End turn SS function. New Turn Index: ${gameState.currentTurnIndex}`)
+    const nextPlayer = gameState.initiative[gameState.currentTurnIndex]; 
+    
+    io.emit('stateUpdate', gameState, {endingTurn: true, startingTurn: false});
+
+    startTurn();
+    
+}
+
+function enemyTurn(enemyId){
+
+    const enemy = gameState.initiative.find(c => c.id === enemyId);
+        const player = gameState.initiative.find(c => c.isPlayer);
+    
+        console.log(`Starting enemy at x: ${enemy.x}, y: ${enemy.y}`);
+        if (!enemy || !player) {
+            return callback({ success: false, message: 'Invalid enemy or player not found.' });
+        }
+    
+        // Move the enemy towards the player
+        const moveResult = moveEnemyTowardsPlayer(enemy, player);
+        // console.log(moveResult)
+    
+        // If the enemy is within range, attack
+        if (moveResult.success) {
+            enemy.x = moveResult.newPosition.x;
+            enemy.y = moveResult.newPosition.y;
+            console.log(`Enemy now at x: ${enemy.x}, y: ${enemy.y}`);
+
+            if(enemy.currentActionCount > 0){
+                enemy.currentActionCount -= 1;
+                const attackResult = enemyAttack(enemy, player);
+                // handle calculation of damage to player
+
+                if (attackResult.defeated) {
+                    // Player is defeated
+                    gameState.initiative = gameState.initiative.filter(c => c.id !== player.id);
+
+                }
+            }
+        } 
+
+        gameState.initiative = [...gameState.initiative]
+        // console.log(gameState.initiative)
+        // Emit updated state to all clients
+        io.emit('stateUpdate', gameState);
+        
+        setTimeout(()=>{
+            endTurn();
+        }, 1000)
+        
+}
+
 function moveEnemyTowardsPlayer(enemy, player) {
     const distanceX = player.x - enemy.x;
     const distanceY = player.y - enemy.y;
@@ -234,10 +294,10 @@ function moveEnemyTowardsPlayer(enemy, player) {
 
     if (Math.abs(distanceX) > Math.abs(distanceY)) {
         enemy.x += Math.sign(distanceX) * moveDistance;
-        enemy.x = Math.max(150, Math.min((gridSize * 9), enemy.x));
+        enemy.x = Math.max(150, Math.min((gameState.gridSize * 9), enemy.x));
     } else {
         enemy.y += Math.sign(distanceY) * moveDistance;
-        enemy.y = Math.max(150, Math.min((gridSize * 9), enemy.y));
+        enemy.y = Math.max(150, Math.min((gameState.gridSize * 9), enemy.y));
     }
 
     return { success: true, newPosition: { x: enemy.x, y: enemy.y } };

@@ -1,3 +1,61 @@
+# Turn-Based Grid Combat Game
+
+## Overview
+This project is a **multiplayer, turn-based strategy game** inspired by tabletop RPG mechanics like *Dungeons & Dragons*. Players move across a **grid-based battlefield**, taking turns to position themselves, attack enemies, and work together to survive against AI-controlled opponents. The game supports **single-player** (one hero vs. enemies) and **cooperative multiplayer** (multiple players vs. enemies).
+
+---
+
+## Core Features
+- **Grid-Based Movement**
+  - Characters move across a 14×14 grid.
+  - Each tile is 50px.
+  - Movement allowance is limited per turn.
+
+- **Turn Order (Initiative System)**
+  - Players and enemies roll initiative at the start of battle.
+  - Turns cycle through the initiative order until the encounter ends.
+
+- **Combat System**
+  - Attack resolution based on **attack vs. defense** stats.
+  - Melee attacks limited to adjacency (within 2 tiles).
+  - Characters track **health, attack, defense, and actions per turn**.
+  - Defeated characters are removed from the initiative.
+
+- **Enemy AI**
+  - AI-controlled goblins move toward the nearest player.
+  - Enemies attack if in range, otherwise reposition.
+
+- **Win/Loss Conditions**
+  - **Victory**: all enemies are defeated.
+  - **Defeat**: all players are defeated.
+
+---
+
+## Multiplayer
+- Built with **Socket.IO** for real-time communication.
+- Players can:
+  - Create and join game rooms.
+  - Take turns in sync across clients.
+  - See shared game state updates (movement, attacks, health, initiative).
+- Supports both **single-player** and **co-op multiplayer** modes.
+
+---
+
+## Tech Stack
+- **Frontend**: React + Phaser.js  
+- **Backend**: Node.js + Express + Socket.IO  
+- **Language**: TypeScript (frontend), JavaScript (backend)  
+
+---
+
+## Future Directions
+- Expand AI logic (different enemy types and tactics).  
+- Add ranged combat, spells, and terrain obstacles.  
+- Player-to-player cooperative abilities.  
+- Deploy as a **progressive web app (PWA)** for desktop and mobile play.  
+
+
+
 # Phaser Next.js Template
 
 This is a Phaser 3 project template that uses the Next.js framework. It includes a bridge for React to Phaser game communication, hot-reloading for quick development workflow and scripts to generate production-ready builds.

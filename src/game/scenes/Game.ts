@@ -30,9 +30,6 @@ export class Game extends Scene
     background: Phaser.GameObjects.Image;
     gameText: Phaser.GameObjects.Text;
 
-    // has user selected an action, and if so, is it an attack action, defense action, bonus action, or movement.
-    actionSelectedTruthy: boolean;
-    actionSelectedCase: string;
     movementHighlightLayer: Phaser.GameObjects.Graphics;
     isMoving: boolean = false;
     isAttacking: boolean = false;
@@ -69,8 +66,8 @@ export class Game extends Scene
      
         const gameStartPayload = {
             players: [
-                { name: "Player 1", id:0, x: 200, y: 350, distance: 5, actionCount:2,currentActionCount:2,bonusActionCount: 1, currentBonusActionCount:1, currentDistance: 5, attack: 20, defense: 5, currentHealth: 50, health: 50, initiative: Math.random() * 20, isPlayer:true, defeated:false },
-                { name: "Player 2", id:10, x: 300, y: 350, distance: 5, actionCount:2,currentActionCount:2,bonusActionCount: 1, currentBonusActionCount:1, currentDistance: 5, attack: 20, defense: 5, currentHealth: 50, health: 50, initiative: Math.random() * 20, isPlayer:true, defeated:false },
+                { name: "Player 1", id:0, x: 200, y: 350, distance: 5, actionCount:2,currentActionCount:2,bonusActionCount: 1, currentBonusActionCount:1, currentDistance: 5, attack: 20, defense: 5, currentHealth: 50, health: 50, initiative: 20, isPlayer:true, defeated:false },
+                { name: "Player 2", id:10, x: 300, y: 350, distance: 5, actionCount:2,currentActionCount:2,bonusActionCount: 1, currentBonusActionCount:1, currentDistance: 5, attack: 20, defense: 5, currentHealth: 50, health: 50, initiative: 6, isPlayer:true, defeated:false },
 
             ],
             map: 'map0'
@@ -96,32 +93,43 @@ export class Game extends Scene
         
         this.socket.off('stateUpdate'); // Ensure no duplicate listeners
         this.socket.on('stateUpdate', (newState) => {
-            this.initiative = newState.initiative;
-
-            this.initiative.forEach((char) => {
-                if (char.sprite) {
-                    char.sprite.setPosition(char.x, char.y); // Update sprite position
+            // Merge character data without losing sprite references
+            debugger;
+            newState.initiative.forEach(updatedChar => {
+                const existingChar = this.initiative.find(c => c.id === updatedChar.id);
+                if (existingChar) {
+                    Object.assign(existingChar, updatedChar);
+                } else {
+                    this.initiative.push(updatedChar); // Handle new character
                 }
             });
         
+            // Remove any characters no longer in the initiative
+            this.initiative = this.initiative.filter(char =>
+                newState.initiative.some(updated => updated.id === char.id)
+            );
+        
+            this.currentTurnIndex = newState.currentTurnIndex;
+            this.selectedCharacter = this.initiative[this.currentTurnIndex];
+        
+            // Always update characters
+            this.setupCharacters();
+        
             if (newState.lastAttack) {
                 const { attackerId, targetId, damage, defeated } = newState.lastAttack;
-        
-                // Optional: Display damage or animation feedback
                 const attacker = this.initiative.find(c => c.id === attackerId);
                 const target = this.initiative.find(c => c.id === targetId);
         
                 if (attacker && target) {
                     this.tweens.add({
                         targets: attacker.sprite,
-                        x: attacker.x + 5, // Small shake effect
+                        x: attacker.x + 5,
                         yoyo: true,
                         duration: 50,
                         repeat: 2
                     });
         
                     this.time.delayedCall(200, () => {
-                        // Flash target sprite red
                         target.sprite?.setTint(0xff0000);
                         this.sound.play('attack_fx');
                         this.time.delayedCall(150, () => target.sprite?.clearTint());
@@ -131,13 +139,15 @@ export class Game extends Scene
                         target.sprite?.destroy();
                     }
                 }
-
-                this.setupCharacters(); // Keep characters in sync with the new state
-              
-    
             }
-            this.createTurnUI(); // Update UI
+        
+            if (this.initiative[this.currentTurnIndex]?.isPlayer && newState.startingTurn === true) {
+                this.startTurn();
+            }
+        
+            this.createTurnUI();
         });
+        
 
         this.socket.on('gameOver', (data) => {
             if (data.winner === 'players') {
@@ -223,7 +233,7 @@ export class Game extends Scene
             return this.add.text(uiX, uiY + index * 30,  this.getCharacterStatusText(char, index), {
                 fontSize: '20px',
                 color: '#FF0000',
-                backgroundColor: index === 0 ? '#00ff00' : '#FFFFFF' // Highlight current turn
+                backgroundColor: index === this.currentTurnIndex ? '#00ffff' : '#FFFFFF' // Highlight current turn
             });
         });
 
@@ -379,7 +389,7 @@ export class Game extends Scene
         });
 
 
-        this.socket.emit('startTurn', this.initiative[this.currentTurnIndex].id);
+        // this.socket.emit('startTurn', this.initiative[this.currentTurnIndex].id);
        
         // if (!this.selectedCharacter.isPlayer) {
         //     this.takeTurn(this.selectedCharacter);
@@ -452,6 +462,7 @@ export class Game extends Scene
             (response: any) => {
                 if (response.success){
                     this.sound.play('steps_fx');
+                    debugger;
                     this.selectedCharacter.currentDistance = response.player.currentDistance;
                     this.selectedCharacter.x = targetX;
                     this.selectedCharacter.y = targetY;
@@ -468,36 +479,22 @@ export class Game extends Scene
             }
         )
         
-        // this.socket.on('invalidMove', (data) => {
-        //     console.log('invalid move, try again')
-        // });
 
-        // this.socket.on('validMove', (data) => {
-
-        //     this.sound.play('steps_fx');
-        //     this.selectedCharacter.currentDistance = data.player.currentDistance;
-        //     this.selectedCharacter.x = targetX;
-        //     this.selectedCharacter.y = targetY;
-
-        //     this.selectedCharacter.sprite?.setPosition(targetX, targetY);
-        //     this.isMoving = !this.isMoving
-        //     this.movementHighlightLayer.clear(); // Remove old highlights
-        //     this.createTurnUI(); // Refresh UI after moving
-        // })
         
     }
 
     // move initiative forward 
     endTurn(): void {
-        this.currentTurnIndex = (this.currentTurnIndex + 1) % this.initiative.length;
+        debugger;
+        // this.currentTurnIndex = (this.currentTurnIndex + 1) % this.initiative.length;
         this.isMoving = false; // Disable movement mode
         this.isAttacking = false;
         this.movementHighlightLayer.clear(); // Remove previous highlights
         this.selectedCharacter.currentDistance = this.selectedCharacter.distance
         this.selectedCharacter.currentActionCount = this.selectedCharacter.actionCount;
-        if(!this.gameOver){
-            this.startTurn();   
-        }
+        
+        this.socket.emit('endTurn');
+   
         
     }
 
@@ -505,30 +502,14 @@ export class Game extends Scene
         return this.initiative[this.currentTurnIndex] === char;
     }
 
-    // enemy logic
-    // takeTurn(enemy: any): void {
-
-    //     // Example AI: Move toward the player if within range
-    //     const player = this.initiative.find((char: any) => char.isPlayer);
-
-    //     if (player) {
-    //         this.moveTowards(enemy, player);
-    //     }
-
-    //     // End turn after movement/action
-    //     setTimeout(() => {
-
-    //         this.endTurn();
-
-    //     },1000)
-
-    // }
+   
 
     // attack enemy
     playerAttack(): void {
         const player = this.selectedCharacter;
+          if (!player || !player.isPlayer || player.currentActionCount==0) return; 
         this.isMoving = false; // Disable movement mode
-        if (!player || !player.isPlayer || player.currentActionCount==0) return; 
+      
         
         const data = {
             roomId: 'room-123', 
@@ -574,81 +555,6 @@ export class Game extends Scene
         console.log("skill")
     }
 
-
-    moveTowards(enemy: any, target: any): void {
-
-        const distanceX = target.x - enemy.x;
-        const distanceY = target.y - enemy.y;
-        const moveDistance = 150; // Move 3 tile per turn
-
-        // Move closer to the player in X or Y direction
-        if (Math.abs(distanceX) > Math.abs(distanceY)) {
-            enemy.x += Math.sign(distanceX) * moveDistance;
-            enemy.x = Math.max(150, Math.min((this.gridSize * 9), enemy.x));
-        } else {
-            enemy.y += Math.sign(distanceY) * moveDistance;
-            enemy.y = Math.max(150, Math.min((this.gridSize * 9), enemy.y));
-        }
-
-        // ✅ Constrain enemy within grid boundaries
-        // enemy.x = Math.max(50, Math.min((this.gridSize * 9), enemy.x));
-        // enemy.y = Math.max(50, Math.min((this.gridSize * 9), enemy.y));
-        this.sound.play('steps_fx');
-        enemy.sprite?.setPosition(enemy.x, enemy.y);
-
-        // ✅ Check for attack range after repositioning
-        const player = this.initiative.find(char => char.isPlayer);
-        const distance = (Math.max(Math.abs(player.x - enemy.x), Math.abs(player.y - enemy.y))/this.gridSize);
-
-        if (distance <= 2){
-            this.enemyAttack(enemy,player);
-        }
-    }
-
-    enemyAttack(enemy: any, target: any): void {
-        // find player character
-        // attack player character
-        // attacking and damage logic
-
-        this.tweens.add({
-            targets: enemy.sprite,
-            x: enemy.x + 5, // Small movement to the right
-            yoyo: true,
-            duration: 50,
-            repeat: 2
-        });
-
-        this.time.delayedCall(200, () => {
-            // Flash enemy sprite red
-            const originalTint = target.sprite?.tint;
-            target.sprite?.setTint(0xff0000);
-            this.sound.play('attack_fx');
-
-    
-            this.time.delayedCall(150, () => {
-                target.sprite?.clearTint(); // Remove tint after flash
-                this.clearAttackHighlights();
-            });
-    
-            // Calculate damage
-            const damage = Math.max(enemy.attack - target.defense, 1);
-            target.currentHealth -= damage;
-            console.log(`${enemy.name} attacks ${target.name} for ${damage} damage!`);
-            
-            // remove "attack mode"
-            this.isAttacking = false
-    
-            // Check if the enemy is defeated
-            if (target.currentHealth <= 0) {
-                console.log(`${target.name} has been defeated!`);
-                target.sprite?.destroy();
-                this.initiative = this.initiative.filter(char => char.currentHealth > 0);
-            }
-    
-            this.createTurnUI();
-
-        });
-    }
 
     changeScene ()
     {

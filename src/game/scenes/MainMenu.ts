@@ -5,7 +5,7 @@ import { EventBus } from '../EventBus';
 export class MainMenu extends Scene
 {
     background: GameObjects.Image;
-    logo: GameObjects.Image;
+    logo: GameObjects.Text;
     title: GameObjects.Text;
     logoTween: Phaser.Tweens.Tween | null;
 
@@ -18,7 +18,7 @@ export class MainMenu extends Scene
     {
         this.background = this.add.image(512, 384, 'background');
 
-        this.logo = this.add.image(512, 300, 'logo').setDepth(100);
+        this.logo = this.add.text(512, 300, 'STRA-TEE-JURY')
 
         const buttonStyle = { fontSize: '20px', color: '#ffffff', backgroundColor: '#333333', padding: { x: 10, y: 5 } };
 
