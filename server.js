@@ -109,7 +109,7 @@ io.on('connection', (socket) => {
         callback({ success: false, message: 'Move too far' });
     }
 });
-    socket.on('playerAttack', ({ attackerId, targetId, distance }) => {
+    socket.on('playerAttack', ({ attackerId, targetId, distance }, callback) => {
         const attacker = gameState.initiative.find(c => c.id === attackerId);
         const target = gameState.initiative.find(c => c.id === targetId);
     
@@ -118,6 +118,13 @@ io.on('connection', (socket) => {
     
         // Check attack range
         if (distance > 2) return;
+
+          // Check if attacker has action points left
+    if (attacker.currentActionCount <= 0) {
+        if (callback) callback({ success: false, message: 'No action points left' });
+        return;
+    }
+
     
         // Calculate damage
         const damage = Math.max(attacker.attack - target.defense, 1);
@@ -210,34 +217,35 @@ function createEnemies(count){
 }
 
 function startTurn(){
-    
-    // console.log(gameState.currentTurnIndex);
+     const currentPlayer = gameState.initiative[gameState.currentTurnIndex];
 
-    const currentPlayer = gameState.initiative[gameState.currentTurnIndex];
-
-    if (currentPlayer.isPlayer === false){
+    if (currentPlayer && currentPlayer.isPlayer === false) {
+        gameState.startingTurn = false;
         enemyTurn(currentPlayer.id);
+    } else if (currentPlayer) {
+        gameState.startingTurn = true;
+        io.emit('stateUpdate', gameState);
     }
-    else{
-        io.emit('stateUpdate', gameState, {startingTurn: true});
-    }
-    
 }
 
 function endTurn(){
 
-    // reset curent characters action and movement points
-    const currentCharacter = gameState.initiative[gameState.currentTurnIndex];
-    currentCharacter.currentActionCount = currentCharacter.actionCount;
-    currentCharacter.currentBonusActionCount = currentCharacter.bonusActionCount;
-    currentCharacter.currentDistance = currentCharacter.distance;
-    // get player ID of next character
+      const currentCharacter = gameState.initiative[gameState.currentTurnIndex];
+    if (currentCharacter) {
+        currentCharacter.currentActionCount = currentCharacter.actionCount;
+        currentCharacter.currentBonusActionCount = currentCharacter.bonusActionCount;
+        currentCharacter.currentDistance = currentCharacter.distance;
+    }
 
-    gameState.currentTurnIndex = (gameState.currentTurnIndex + 1) % gameState.initiative.length;
-    // console.log(`End turn SS function. New Turn Index: ${gameState.currentTurnIndex}`)
-    const nextPlayer = gameState.initiative[gameState.currentTurnIndex]; 
-    
-    io.emit('stateUpdate', gameState, {endingTurn: true, startingTurn: false});
+    // Advance turn index only if initiative is not empty
+    if (gameState.initiative.length > 0) {
+        gameState.currentTurnIndex = (gameState.currentTurnIndex + 1) % gameState.initiative.length;
+        const nextPlayer = gameState.initiative[gameState.currentTurnIndex];
+    }
+
+    // Mark turn as ending
+    gameState.startingTurn = false;
+    io.emit('stateUpdate', gameState);
 
     startTurn();
     

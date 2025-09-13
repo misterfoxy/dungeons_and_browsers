@@ -368,7 +368,7 @@ export class Game extends Scene
 
     // highlight current player. if COM player, execute enemyAI logic
     startTurn(): void {
-
+        debugger;
         this.initiative.forEach((char) => {
             char.sprite?.clearTint(); // Remove tint from all characters
         });
@@ -485,16 +485,19 @@ export class Game extends Scene
 
     // move initiative forward 
     endTurn(): void {
-        debugger;
-        // this.currentTurnIndex = (this.currentTurnIndex + 1) % this.initiative.length;
-        this.isMoving = false; // Disable movement mode
-        this.isAttacking = false;
-        this.movementHighlightLayer.clear(); // Remove previous highlights
-        this.selectedCharacter.currentDistance = this.selectedCharacter.distance
+       debugger;
+    this.isMoving = false; // Disable movement mode
+    this.isAttacking = false;
+    this.movementHighlightLayer.clear(); // Remove previous highlights
+
+    if (this.selectedCharacter) {
+        this.selectedCharacter.currentDistance = this.selectedCharacter.distance;
         this.selectedCharacter.currentActionCount = this.selectedCharacter.actionCount;
-        
-        this.socket.emit('endTurn');
-   
+    } else {
+        console.warn('endTurn: selectedCharacter is undefined');
+    }
+
+    this.socket.emit('endTurn');
         
     }
 
