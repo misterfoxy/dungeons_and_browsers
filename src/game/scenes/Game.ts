@@ -94,7 +94,7 @@ export class Game extends Scene
         this.socket.off('stateUpdate'); // Ensure no duplicate listeners
         this.socket.on('stateUpdate', (newState) => {
             // Merge character data without losing sprite references
-            debugger;
+
             newState.initiative.forEach(updatedChar => {
                 const existingChar = this.initiative.find(c => c.id === updatedChar.id);
                 if (existingChar) {
@@ -116,6 +116,9 @@ export class Game extends Scene
             this.setupCharacters();
         
             if (newState.lastAttack) {
+
+                
+
                 const { attackerId, targetId, damage, defeated } = newState.lastAttack;
                 const attacker = this.initiative.find(c => c.id === attackerId);
                 const target = this.initiative.find(c => c.id === targetId);
@@ -368,7 +371,7 @@ export class Game extends Scene
 
     // highlight current player. if COM player, execute enemyAI logic
     startTurn(): void {
-        debugger;
+
         this.initiative.forEach((char) => {
             char.sprite?.clearTint(); // Remove tint from all characters
         });
@@ -458,11 +461,19 @@ export class Game extends Scene
 
         if (!this.isMoving) return; // Only move if in movement mode
 
+         const occupied = this.initiative.some(char => char.x === targetX && char.y === targetY && char !== this.selectedCharacter);
+         if (occupied) {
+            this.sound.play('steps_fx');
+         console.log('Cannot move: tile is occupied!');
+             return;
+    }
+
+
         this.socket.emit('playerMove',{char: this.selectedCharacter, currentx:this.selectedCharacter.x,currenty:this.selectedCharacter.y,targetx:targetX,targety:targetY},
             (response: any) => {
                 if (response.success){
                     this.sound.play('steps_fx');
-                    debugger;
+
                     this.selectedCharacter.currentDistance = response.player.currentDistance;
                     this.selectedCharacter.x = targetX;
                     this.selectedCharacter.y = targetY;
@@ -485,7 +496,7 @@ export class Game extends Scene
 
     // move initiative forward 
     endTurn(): void {
-       debugger;
+
     this.isMoving = false; // Disable movement mode
     this.isAttacking = false;
     this.movementHighlightLayer.clear(); // Remove previous highlights

@@ -90,6 +90,14 @@ io.on('connection', (socket) => {
     }
     const character = gameState.initiative[charIndex];
 
+
+      // Occupancy check
+    const occupied = gameState.initiative.some(c => c.id !== character.id && c.x === data.targetx && c.y === data.targety);
+    if (occupied) {
+        callback({ success: false, message: 'Tile occupied' });
+        return;
+    }
+
     const distance = Math.max(
         Math.abs(data.targetx - character.x) / gameState.gridSize,
         Math.abs(data.targety - character.y) / gameState.gridSize
@@ -230,18 +238,19 @@ function startTurn(){
 
 function endTurn(){
 
-      const currentCharacter = gameState.initiative[gameState.currentTurnIndex];
-    if (currentCharacter) {
-        currentCharacter.currentActionCount = currentCharacter.actionCount;
-        currentCharacter.currentBonusActionCount = currentCharacter.bonusActionCount;
-        currentCharacter.currentDistance = currentCharacter.distance;
-    }
-
-    // Advance turn index only if initiative is not empty
+     // Advance turn index first
     if (gameState.initiative.length > 0) {
         gameState.currentTurnIndex = (gameState.currentTurnIndex + 1) % gameState.initiative.length;
-        const nextPlayer = gameState.initiative[gameState.currentTurnIndex];
     }
+
+    // Now reset the points for the character whose turn is starting
+    const nextCharacter = gameState.initiative[gameState.currentTurnIndex];
+    if (nextCharacter) {
+        nextCharacter.currentActionCount = nextCharacter.actionCount;
+        nextCharacter.currentBonusActionCount = nextCharacter.bonusActionCount;
+        nextCharacter.currentDistance = nextCharacter.distance;
+    }
+  
 
     // Mark turn as ending
     gameState.startingTurn = false;
@@ -307,6 +316,13 @@ function moveEnemyTowardsPlayer(enemy, player) {
         enemy.y += Math.sign(distanceY) * moveDistance;
         enemy.y = Math.max(150, Math.min((gameState.gridSize * 9), enemy.y));
     }
+
+    //   // Check if the new position is occupied
+    // const occupied = gameState.initiative.some(c => c.id !== enemy.id && c.x === newX && c.y === newY);
+    // if (occupied) {
+    //     // Don't move if occupied
+    //     return { success: false, newPosition: { x: enemy.x, y: enemy.y } };
+    // }
 
     return { success: true, newPosition: { x: enemy.x, y: enemy.y } };
 }
